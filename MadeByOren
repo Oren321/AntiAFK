@@ -1,91 +1,71 @@
--- Gui Source
-local PrivateScript = loadstring(game:HttpGet("https://raw.githubusercontent.com/OrenSck/Src/refs/heads/main/Gui", true))()
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ThievingCmds = require(ReplicatedStorage.Library.Client.ThievingCmds)
 
--- Making The Window
-local window = PrivateScript:Window({
-    Title = "Pets Go | Private Script", 
-    isMobile = false,
-    Size = {
-        X = 550,
-        Y = 400
-    },
-    CustomTheme = {
-        defaultTab = Color3.fromHex("#a49ae6"),
-        background = Color3.fromRGB(40, 44, 50),
-        secondaryBackground = Color3.fromRGB(49, 56, 66),
-        tertiaryBackground = Color3.fromRGB(57, 63, 75),
-        text = Color3.fromRGB(220,221,225),
-        image = Color3.fromRGB(220,221,225),
-        placeholder = Color3.fromRGB(165,166,169),
-        close = Color3.fromRGB(190, 100, 105)
-    },
-    KeyCode = Enum.KeyCode.T
-})
+-- Convert stored positions into actual CFrame objects
+local BoothAndCFrame = {
+    ["1 | Royal Booth"] = CFrame.new(
+        349.891266, 16.8304901, 37.4022408,
+        -0.972637773, -4.03870763e-05, 0.23232691,
+        4.03870763e-05, 0.99999994, 0.000342917949,
+        -0.23232691, 0.000342917949, -0.972637653
+    )
+}
 
---AutoFarm Tab
-local AutoFarm = window:Tab({
-    Name = "AutoFarm",
-    tabColor = Color3.fromRGB(255, 192, 203),
-    Image = "rbxassetid://10709769841"
-})
+local thievingEnabled = false
+local selectedBoothId = nil
 
-local isToggled = false
+local function getBoothIdAndCFrame(boothName)
+    if BoothAndCFrame[boothName] then
+        return boothName, BoothAndCFrame[boothName]
+    end
+    return nil, nil
+end
 
-AutoFarm:Toggle({
-   Name = "Auto Roll",
-   Default = false,
-   Callback = function(var)
-       isToggled = var
-       while isToggled do
-           game:GetService("ReplicatedStorage").Network.Eggs_Roll:InvokeServer()
-           task.wait()
-       end
-   end
-})
+local function thieveAtBooth()
+    while thievingEnabled and selectedBoothId do
+        local args = {selectedBoothId}
+        ReplicatedStorage:WaitForChild("Network"):WaitForChild("Thieving_Thieve"):InvokeServer(unpack(args))
+        task.wait(1) -- Adjust delay as needed
+    end
+end
 
-local isToggled = false
+local foundObjects = {}
 
-AutoFarm:Toggle({
-    Name = "Auto Collect Orbs",
-    Default = false,
-    Callback = function(var)
-        isToggled = var
-        if isToggled then
-            spawn(function()
-                while isToggled do
-                    local orbs = workspace.__THINGS.Orbs:GetChildren()
-                    for _, orb in pairs(orbs) do
-                        local args = { [1] = { orb.Name } }
-                        game:GetService("ReplicatedStorage"):WaitForChild("Network"):WaitForChild("Orbs: Collect"):FireServer(unpack(args))
-                        orb:Destroy()
-                    end
-                    task.wait()
-                end
-            end)
+for _, model in pairs(workspace:GetDescendants()) do
+    if model:IsA("Model") then
+        local thievingObject = ThievingCmds.GetObjectByModel(model)
+        if thievingObject and not foundObjects[thievingObject] then
+            foundObjects[thievingObject] = true
+            if thievingObject._id and thievingObject._cframe then
+                print("_id: " .. tostring(thievingObject._id))
+                print("_cframe: " .. tostring(thievingObject._cframe))
+            end
+        end
+    end
+end
+
+MiniGames:Dropdown({
+    Name = "Quake Dropdown",
+    Items = {"1 | Royal Booth", "Apple", "Banana", "Carrot", "Dingleberry"},
+    Default = "Apple",
+    Multiselect = false,
+    Callback = function(selectedItems)
+        selectedBoothId, _ = getBoothIdAndCFrame(selectedItems[1])
+        print("Selected Booth ID: " .. tostring(selectedBoothId))
+        if thievingEnabled and selectedBoothId then
+            task.spawn(thieveAtBooth)
         end
     end
 })
 
---Event Tab
-local Event = window:Tab({
-    Name = "Event",
-    tabColor = Color3.fromRGB(255, 192, 203),
-    Image = "rbxassetid://10709769841"
-})
-
-local isToggled = false
-
-Event:Toggle({
-    Name = "Auto Mine Event",
+MiniGames:Toggle({
+    Name = "Auto Thieve",
     Default = false,
     Callback = function(var)
-        isToggled = var
-        if isToggled then
-            while isToggled do
-            local args1 = { [1] = true }
-            game:GetService("ReplicatedStorage"):WaitForChild("Network"):WaitForChild("Mining_SetState"):InvokeServer(unpack(args1))
-            local args2 = { [1] = 12 }
-            game:GetService("ReplicatedStorage"):WaitForChild("Network"):WaitForChild("Mining_Attack"):InvokeServer(unpack(args2))
+        thievingEnabled = var
+        print("Auto Thieve Toggle", var)
+        if thievingEnabled and selectedBoothId then
+            task.spawn(thieveAtBooth)
         end
     end
 })
